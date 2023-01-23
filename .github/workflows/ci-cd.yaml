@@ -11,15 +11,18 @@ on:
         required: true
         default: '3.11'
         options:
-          - "3.9"
-          - "3.10"
+          #- "3.9"
+          #- "3.10"
           - "3.11"
 
 jobs:    
   build:
     strategy:
       matrix:
-        version: ['3.9', '3.10', '3.11']
+        version: 
+        #- '3.9'
+        #- '3.10'
+        - '3.11'
     runs-on: ubuntu-latest
 
     steps:
@@ -56,11 +59,17 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest
+          pip install pytest pytest-cov coverage-badge
 
       - name: Test with Pytest
         run: |
           pytest --doctest-modules --ignore=server.py
+      
+      - name: Run test coverage
+        run: |
+          pytest --cov=. . --doctest-modules --ignore=server.py
+          rm coverage.svg
+          coverage-badge -o coverage.svg 
 
   deploy:
     runs-on: ubuntu-latest
