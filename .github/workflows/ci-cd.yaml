@@ -68,8 +68,7 @@ jobs:
       - name: Run test coverage
         run: |
           pytest --cov=. . --doctest-modules --ignore=server.py
-          rm coverage.svg
-          coverage-badge -o coverage.svg 
+          coverage-badge -o coverage.svg -f
 
   deploy:
     runs-on: ubuntu-latest
