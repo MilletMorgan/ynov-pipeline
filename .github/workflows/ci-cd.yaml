@@ -5,7 +5,15 @@ on:
     branches:
       - main
   workflow_dispatch:
-      
+    inputs:
+      server-python-version:
+        description: 'Python version to use on server'
+        required: true
+        default: '3.11'
+        options:
+          - "3.9"
+          - "3.10"
+          - "3.11"
 
 jobs:    
   build:
@@ -37,7 +45,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: build
     steps:
       - uses: actions/checkout@v3
       - name: Setup Python
@@ -56,7 +64,7 @@ jobs:
 
   deploy:
     runs-on: ubuntu-latest
-    needs: [test, build]
+    needs: test
     steps:
       - name: MEP
         run: echo "MEP on server"
@@ -71,9 +79,10 @@ jobs:
           pip install requests
           python -c "import requests; exit(1) if requests.get('https://www.google.fr').status_code != 200 else exit(0)"
 
-  finish:
+  post-on-slack:
     runs-on: ubuntu-latest
-    needs: [deploy]
+    needs: deploy
+    if: always()
     steps:
-      - name: Finish
-        run: echo "Pipeline finish with success."
+      - name: Slack message
+        run: echo "Pipeline finish with success, or not..."
