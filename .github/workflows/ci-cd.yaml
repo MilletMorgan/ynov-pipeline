@@ -15,7 +15,10 @@ on:
           #- "3.10"
           - "3.11"
 
-jobs:    
+permissions:
+  contents: write 
+
+jobs:
   build:
     strategy:
       matrix:
@@ -80,20 +83,20 @@ jobs:
         with:
           files: coverage.svg
 
-      - name: Commit files
-        if: steps.changed_files.outputs.files_changed == 'true'
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add coverage.svg
-          git commit -m "Updated coverage.svg"
+      #- name: Commit files
+       # if: steps.changed_files.outputs.files_changed == 'true'
+        #run: |
+         # git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          #git config --local user.name "github-actions[bot]"
+          #git add coverage.svg
+          #git commit -m "Updated coverage.svg"
 
-      - name: Push changes
-        if: steps.changed_files.outputs.files_changed == 'true'
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.github_token }}
-          branch: ${{ github.ref }}
+      #- name: Push changes
+       # if: steps.changed_files.outputs.files_changed == 'true'
+        #uses: ad-m/github-push-action@master
+        #with:
+         # github_token: ${{ secrets.github_token }}
+          #branch: ${{ github.ref }}
 
   deploy:
     runs-on: ubuntu-latest
@@ -111,6 +114,29 @@ jobs:
         run: |
           pip install requests
           python -c "import requests; exit(1) if requests.get('https://www.google.fr').status_code != 200 else exit(0)"
+
+  deploy-gh-pages:
+    needs: test
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Commit files
+        run: |
+          ls
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          # Upload entire repository
+          path: './cov_html'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1
 
   post-on-slack:
     runs-on: ubuntu-latest
