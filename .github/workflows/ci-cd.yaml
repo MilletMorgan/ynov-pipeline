@@ -1,122 +1,76 @@
-name: YNOV pipeline CI/CD
+name: python-workflow
 
-on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
-    inputs:
-      server-python-version:
-        description: 'Python version to use on server'
-        required: true
-        default: '3.11'
-        options:
-          #- "3.9"
-          #- "3.10"
-          - "3.11"
+on: [workflow_dispatch, push]
 
-permissions:
-  contents: write 
+permissions: write-all
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        version: 
-        #- '3.9'
-        #- '3.10'
-        - '3.11'
+  lint_flake8:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v3
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v3
         with:
-          python-version: ${{ matrix.version }}
-
+          python-version: "3.10"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install flake8 black
-
+          pip install flake8
       - name: Lint with flake8
         run: |
-          flake8 .
-
-      #- name: Lint with black
-      #  run: |
-      #    black . --check
-
+          python3 -m flake8 server.py
+          python3 -m flake8 misc.py
 
   test:
     runs-on: ubuntu-latest
-    needs: build
+    strategy:
+      matrix:
+        version: ["3.9", "3.10", "3.11"]
     steps:
       - uses: actions/checkout@v3
+      - name: Set up Python ${{ matrix.version }}
+        uses: actions/setup-python@v3
         with:
-            fetch-depth: 0
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-
+          python-version: ${{ matrix.version }}
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-cov
-
+          pip install pytest
       - name: Test with Pytest
-        run: |
-          pytest --doctest-modules --ignore=server.py
-              
-      - name: Run test coverage
-        run: |
-          pytest --cov=. . --doctest-modules --ignore=server.py
+        run: python3 -m pytest misc.py --doctest-modules
 
-      - name: Coverage Badge
-        uses: tj-actions/coverage-badge-py@v1.8
-
-      - name: Verify Changed files
-        uses: tj-actions/verify-changed-files@v12
-        id: changed_files
-        with:
-          files: coverage.svg
-
-      #- name: Commit files
-       # if: steps.changed_files.outputs.files_changed == 'true'
-        #run: |
-         # git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          #git config --local user.name "github-actions[bot]"
-          #git add coverage.svg
-          #git commit -m "Updated coverage.svg"
-
-      #- name: Push changes
-       # if: steps.changed_files.outputs.files_changed == 'true'
-        #uses: ad-m/github-push-action@master
-        #with:
-         # github_token: ${{ secrets.github_token }}
-          #branch: ${{ github.ref }}
-
-  deploy:
+  coverage:
     runs-on: ubuntu-latest
     needs: test
     steps:
-      - name: MEP
-        run: echo "MEP on server"
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v3
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v3
         with:
-          python-version: "3.11"
-
-      - name: Test if website is up 🚀
+          python-version: "3.10"
+      - name: Install dependencies
         run: |
-          pip install requests
-          python -c "import requests; exit(1) if requests.get('https://www.google.fr').status_code != 200 else exit(0)"
-
-  deploy-gh-pages:
-    needs: test
+          python -m pip install --upgrade pip
+          pip install coverage-badge pytest-cov
+      - name: Test coverage
+        run: |
+          python3 -m pytest --cov=. . --doctest-modules --ignore=server.py
+          coverage-badge -o coverage.svg -f
+          coverage html
+      - name: Commit files
+        run: |
+          git config --global user.email "guillaume.faugeron@ynov.com"
+          git config --global user.name "guillaumefaugeron"
+          git add -A
+          git add htmlcov -f          
+          git commit -m "Update coverage.svg" || echo "No changes to commit"
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          branch: "main"
+  deploy-cov:
+    needs: coverage
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -124,24 +78,30 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Commit files
+      - name: Update files
         run: |
-          ls
+          git pull
       - name: Setup Pages
         uses: actions/configure-pages@v3
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
           # Upload entire repository
-          path: './cov_html'
+          path: 'htmlcov'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v1
+  deploy:
+    runs-on: ubuntu-latest
+    needs: coverage
+    steps:
+      - name: curl google.com
+        run: curl https://www.google.com/
 
-  post-on-slack:
+  message:
     runs-on: ubuntu-latest
     needs: deploy
     if: always()
     steps:
-      - name: Slack message
-        run: echo "Pipeline finish with success, or not..."
+      - name: Message
+        run: echo Pipeline executed
